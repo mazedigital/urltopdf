@@ -12,7 +12,7 @@
 					'website' => 'http://www.bloodbone.ws',
 					'email' => 'brendan@bloodbone.ws'
 				),
-				'description' => 'Uses the TCPDF library to take your HTML page and output it as a PDF'
+				'description' => 'Uses the mPDF library to take your HTML page and output it as a PDF'
 			);
 		}
 
@@ -42,6 +42,8 @@
 
 			if(!isset($page_data['type']) || !is_array($page_data['type']) || empty($page_data['type'])) return;
 
+			if (isset($_GET['debug']) || isset($_GET['preview']) ) return;
+
 			foreach($page_data['type'] as $type) {
 				if($type == 'pdf') {
 					// Page has the 'pdf' type set, so lets generate!
@@ -62,14 +64,24 @@
 			$pdf->SetAuthor($params['website-name']);
 			$pdf->SetTitle($params['page-title']);
 
+			// var_dump($output);die;
+
 			// output the HTML content
-			$pdf->writeHTML($output, true, false, true, false, '');
+			$pdf->writeHTML($output);
+			// $pdf->writeHTML($output, true, false, true, false, '');
 
 			// reset pointer to the last page
-			$pdf->lastPage();
+			// $pdf->lastPage();
 
 			//Close and output PDF document
-			$pdf->Output(sprintf('%s - %s', $params['website-name'], $params['page-title']), 'I');
+			if ($params['current-page']=='pdf'){
+				$name = $params['root-page'];
+			} else {
+				$name = $params['current-page'];
+			}
+			$name .= '-'.$params['member-current-account.name'].'.pdf';
+			$pdf->Output('name','I');
+			exit();
 		}
 
 		public function generatePDFAttachments(&$output) {
@@ -104,7 +116,7 @@
 				$pdf->writeHTML($data, true, false, true, false, '');
 
 				// reset pointer to the last page
-				$pdf->lastPage();
+				// $pdf->lastPage();
 
 				// get the output of the PDF as a string and save it to a file
 				// attempt to find the filename if it's provided with @data-utp-filename
@@ -126,7 +138,27 @@
 			$output = $dom->saveHTML();
 		}
 
+
 		private static function initPDF() {
+			// ini_set('memory_limit', '256M');
+			// set_time_limit('90000');
+			require_once(EXTENSIONS . '/urltopdf/lib/MPDF57/mpdf.php');
+
+			// $pdf = new mpdf('', 'A4');
+			$pdf = new mpdf('', 'A4',0,'',15,15,16,25,0,16,'P');
+			$pdf->simpleTables = true;
+
+
+			$pdf->debug = true;
+			//$pdf->packTableData = true;
+			$pdf->SetProtection(array('copy','print'), '', 'aVeryDifficultPasswordMyRTFX');
+			//$pdf->setAutoTopMargin  = 'stretch';
+			//$pdf->setAutoBottomMargin = 'stretch';
+
+			return $pdf;
+		}
+
+		/*private static function initPDF() {
 			require_once(EXTENSIONS . '/urltopdf/lib/tcpdf/config/lang/eng.php');
 			require_once(EXTENSIONS . '/urltopdf/lib/tcpdf/tcpdf.php');
 
@@ -158,6 +190,6 @@
 			$pdf->AddPage();
 
 			return $pdf;
-		}
+		}*/
 
 	}
