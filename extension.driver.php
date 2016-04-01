@@ -145,8 +145,10 @@
 			require_once(EXTENSIONS . '/urltopdf/lib/MPDF57/mpdf.php');
 
 			// $pdf = new mpdf('', 'A4');
-			$pdf = new mpdf('', 'A4',0,'',15,15,16,25,0,16,'P');
+			$pdf = new mpdf('', 'A4',0,'',15,15,25,25,0,16,'P'); //left,right,top,bottom
 			$pdf->simpleTables = true;
+
+			$pdf->h2toc = array('H1'=>0, 'H2'=>1, 'H3'=>2);
 
 
 			$pdf->debug = true;
