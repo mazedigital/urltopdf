@@ -38,6 +38,7 @@
 		 * Generate a PDF from a complete URL
 		 */
 		public function generatePDFfromURL(array &$context = null) {
+
 			$page_data = Frontend::Page()->pageData();
 
 			if(!isset($page_data['type']) || !is_array($page_data['type']) || empty($page_data['type'])) return;
@@ -57,15 +58,15 @@
 		}
 
 		public function generatePDF($output) {
+			preg_match_all("~<name>(.*)</name>~",$output, $pdfFileName);
+			$pdfName = $pdfFileName[1][0];
 			$params = Frontend::Page()->_param;
 
 			$pdf = self::initPDF();
 
 			$pdf->SetAuthor($params['website-name']);
 			$pdf->SetTitle($params['page-title']);
-
-			// var_dump($output);die;
-
+			
 			// output the HTML content
 			$pdf->writeHTML($output);
 			// $pdf->writeHTML($output, true, false, true, false, '');
@@ -74,13 +75,19 @@
 			// $pdf->lastPage();
 
 			//Close and output PDF document
-			if ($params['current-page']=='pdf'){
-				$name = $params['root-page'];
-			} else {
-				$name = $params['current-page'];
+			// if ($params['current-page']=='pdf'){
+			// 	$name = $params['root-page'];
+			// } else {
+			// 	$name = $params['current-page'];
+			// }
+			// $name .= '-'.$params['member-current-account.name'].'.pdf';
+
+			if ($pdfName != ''){
+				$pdf->Output($pdfName,'I');
 			}
-			$name .= '-'.$params['member-current-account.name'].'.pdf';
-			$pdf->Output('name','I');
+			else{
+				$pdf->Output('pdf','I');
+			}
 			exit();
 		}
 
