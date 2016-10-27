@@ -23926,7 +23926,12 @@ function _tableColumnWidth(&$table,$firstpass=false){
 				unset($table['w']); 
 			}
 		}
-		$ratio = $checkminwidth/$mxw;
+		if($mxw == 0){
+			$ratio = $checkminwidth/1;
+		}
+		else{
+			$ratio = $checkminwidth/$mxw;
+		}
 		if ($checkminwidth > $mxw) { return array(($ratio +0.001),$checkminwidth); }	// 0.001 to allow for rounded numbers when resizing
 	}
 	unset($cs); 
