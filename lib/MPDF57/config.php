@@ -207,7 +207,7 @@ $this->tableMinSizePriority = false;	// If page-break-inside:avoid but cannot fi
 							// exceeding autosize; setting this value to true will force respsect for
 							// autosize, and disable the page-break-inside:avoid
 
-$this->use_kwt = false;				// "Keep-with-table"
+$this->use_kwt = true;				// "Keep-with-table"
 $this->iterationCounter = false;		// Set to TRUE to use table Head iteration counter
 $this->splitTableBorderWidth = 0;		// Use table border (using this width in mm) when table breaks across pages
 							// Recommended to use small value e.g. 0.01
