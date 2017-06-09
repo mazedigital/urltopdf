@@ -44,19 +44,36 @@
 
 			if (isset($_GET['debug']) || isset($_GET['preview']) ) return;
 
+			$matches = array();
+			$hasAttachments = preg_match("~^(<!.*>\s)?(<attachments>.+<\/attachments>)~sU", $context['output'],$matches);
+
+			$attachments = array();
+			if ($hasAttachments){
+				$attachmentsString = $matches[2];
+
+				$context['output'] = str_replace($attachmentsString, "", $context['output']);
+
+				$attachmentsXML = XMLElement::convertFromXMLString('attachments',$attachmentsString);
+				
+				foreach ($attachmentsXML->getChildren() as $key => $value) {
+					$attachments[] = $value->getValue();
+				}
+
+			}
+
 			foreach($page_data['type'] as $type) {
 				if($type == 'pdf') {
 					// Page has the 'pdf' type set, so lets generate!
-					$this->generatePDF($context['output']);
+					$this->generatePDF($context['output'],$attachments);
 				}
 				else if($type == 'pdf-attachment') {
 					// Page has the 'pdf-attachment' type set, so lets generate some attachments
-					$this->generatePDFAttachments($context['output']);
+					$this->generatePDFAttachments($context['output'],$attachments);
 				}
 			}
 		}
 
-		public function generatePDF($output) {
+		public function generatePDF($output,$attachments) {
 			$params = Frontend::Page()->_param;
 
 			$pdf = self::initPDF();
@@ -64,14 +81,34 @@
 			$pdf->SetAuthor($params['website-name']);
 			$pdf->SetTitle($params['page-title']);
 
-			// var_dump($output);die;
-
 			// output the HTML content
 			$pdf->writeHTML($output);
-			// $pdf->writeHTML($output, true, false, true, false, '');
 
 			// reset pointer to the last page
 			// $pdf->lastPage();
+
+			// If attachments are available add these to the PDF
+			if ($attachments){
+				$pdf->SetImportUse();
+
+				$filesTotal = count($attachments);
+
+				foreach ($attachments as $fileNumber => $attachment) {
+
+					$filepath = WORKSPACE . $attachment;
+
+					$pagecount = $pdf->SetSourceFile($filepath);
+
+				    for ($i=1; $i<=$pagecount; $i++) {
+				    	//add a new page as PDF should not contain one
+				        $pdf->AddPage();
+
+				        $import_page = $pdf->ImportPage();
+				        $pdf->UseTemplate($import_page);
+				    }
+				}
+			}
+
 
 			//Close and output PDF document
 			if ($params['current-page']=='pdf'){
@@ -84,7 +121,7 @@
 			exit();
 		}
 
-		public function generatePDFAttachments(&$output) {
+		public function generatePDFAttachments(&$output,$attachments) {
 			$params = Frontend::Page()->_param;
 
 			$dom = new DOMDocument('1.0', 'UTF-8');
@@ -140,11 +177,8 @@
 
 
 		private static function initPDF() {
-			// ini_set('memory_limit', '256M');
-			// set_time_limit('90000');
 			require_once(EXTENSIONS . '/urltopdf/lib/MPDF57/mpdf.php');
 
-			// $pdf = new mpdf('', 'A4');
 			$pdf = new mpdf('', 'A4',0,'',15,15,25,25,0,16,'P'); //left,right,top,bottom
 			$pdf->simpleTables = true;
 
@@ -153,45 +187,12 @@
 
 			$pdf->debug = true;
 			//$pdf->packTableData = true;
-			$pdf->SetProtection(array('copy','print'), '', 'aVeryDifficultPasswordMyRTFX');
+			$securePassword = uniqid('securePassword');
+			$pdf->SetProtection(array('copy','print'), '', $securePassword);
 			//$pdf->setAutoTopMargin  = 'stretch';
 			//$pdf->setAutoBottomMargin = 'stretch';
 
 			return $pdf;
 		}
-
-		/*private static function initPDF() {
-			require_once(EXTENSIONS . '/urltopdf/lib/tcpdf/config/lang/eng.php');
-			require_once(EXTENSIONS . '/urltopdf/lib/tcpdf/tcpdf.php');
-
-			// create new PDF document
-			$pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
-
-			// set document information
-			$pdf->SetCreator(PDF_CREATOR);
-
-			$pdf->setPrintHeader(false);
-			$pdf->setPrintFooter(false);
-
-			// set default monospaced font
-			$pdf->SetDefaultMonospacedFont(PDF_FONT_MONOSPACED);
-
-			//set margins
-			$pdf->SetMargins(20, 20, 20);
-
-			//set auto page breaks
-			$pdf->SetAutoPageBreak(TRUE, 20);
-
-			//set image scale factor
-			$pdf->setImageScale(PDF_IMAGE_SCALE_RATIO);
-
-			//set some language-dependent strings
-			$pdf->setLanguageArray($l);
-
-			// add a page
-			$pdf->AddPage();
-
-			return $pdf;
-		}*/
 
 	}
