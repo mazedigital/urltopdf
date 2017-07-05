@@ -177,9 +177,16 @@
 
 
 		private static function initPDF() {
-			require_once(EXTENSIONS . '/urltopdf/lib/MPDF57/mpdf.php');
+			require_once EXTENSIONS . '/urltopdf/vendor/autoload.php';
 
-			$pdf = new mpdf('', 'A4',0,'',15,15,25,25,0,16,'P'); //left,right,top,bottom
+			define('_MPDF_TEMP_PATH',TMP); 
+			define('_JPGRAPH_PATH',TMP. '/graph'); 
+			define('_MPDF_TTFONTPATH',WORKSPACE . '/urltopdf/ttfonts/'); 
+			define('_MPDF_TTFONTDATAPATH',WORKSPACE . '/urltopdf/ttfontdata/'); 
+			$pdf = new mPDF('', 'A4',0,'',15,15,25,25,0,16,'P');
+			// require_once(EXTENSIONS . '/urltopdf/lib/MPDF57/mpdf.php');
+
+			// $pdf = new mpdf('', 'A4',0,'',15,15,25,25,0,16,'P'); //left,right,top,bottom
 			$pdf->simpleTables = true;
 
 			$pdf->h2toc = array('H1'=>0, 'H2'=>1, 'H3'=>2);
