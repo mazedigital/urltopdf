@@ -1,12 +1,16 @@
 <?php
-/**
- * This file is part of FPDI
- *
- * @package   FPDI
- * @copyright Copyright (c) 2017 Setasign - Jan Slabon (https://www.setasign.com)
- * @license   http://opensource.org/licenses/mit-license The MIT License
- * @version   1.6.2
- */
+// +---------------------------------------------------------------------+
+// | FPDI PDF-Parser v.1.1.3                                             |
+// | Copyright (c) 2009-2016 Setasign - Jan Slabon                       |
+// +---------------------------------------------------------------------+
+// | This source file is subject to the                                  |
+// |    "FPDI PDF-Parser Commercial Developer License Agreement"         |
+// | that is bundled with this package in the file                       |
+// |    "FPDI-PDF-Parser-License.pdf"                                    |
+// +---------------------------------------------------------------------+
+// | Homepage: https://www.setasign.com                                  |
+// | E-mail: support@setasign.com                                        |
+// +---------------------------------------------------------------------+
 
 /**
  * Class pdf_parser
@@ -117,21 +121,21 @@ class pdf_parser
      * @var string
      */
     public $filename;
-
+    
     /**
      * File resource
      *
      * @var resource
      */
     protected $_f;
-
+    
     /**
      * PDF Context
      *
      * @var pdf_context
      */
     protected $_c;
-
+    
     /**
      * xref-Data
      *
@@ -148,7 +152,6 @@ class pdf_parser
 
     /**
      * PDF version of the loaded document
-     *
      * @var string
      */
     protected $_pdfVersion;
@@ -168,17 +171,25 @@ class pdf_parser
     protected $_currentObj;
 
     /**
+     * Cache for opened object streams
+     *
+     * @var array
+     */
+    protected $_objStreamCache = array();
+    
+    /**
      * Constructor
      *
-     * @param string $filename Source filename
+     * @param string $filename  Source Filename
      * @throws InvalidArgumentException
+     * @throws Exception
      */
     public function __construct($filename)
     {
         $this->filename = $filename;
-
+        
         $this->_f = @fopen($this->filename, 'rb');
-
+        
         if (!$this->_f) {
             throw new InvalidArgumentException(sprintf('Cannot open %s !', $filename));
         }
@@ -190,10 +201,20 @@ class pdf_parser
         }
         $this->_c = new pdf_context($this->_f);
 
-        // Read xref-Data
         $this->_xref = array();
-        $this->_readXref($this->_xref, $this->_findXref());
+        try {
+            $this->_readXref($this->_xref, $this->_findXref());
+        } catch (Exception $e) {
+            $this->_extractXref($this->_xref);
+            if (!isset($this->_xref['trailer'])) {
+                throw $e;
+            }
+        }
 
+        if (!isset($this->_xref['xref']) || count($this->_xref['xref']) == 0) {
+            throw new Exception('Unable to find xref table.');
+        }
+        
         // Check for Encryption
         $this->getEncryption();
 
@@ -217,7 +238,7 @@ class pdf_parser
         if (isset($this->_f) && is_resource($this->_f)) {
             fclose($this->_f);
             unset($this->_f);
-        }
+        }    
     }
 
     /**
@@ -270,12 +291,11 @@ class pdf_parser
     protected function _findXref()
     {
         $toRead = self::$searchForStartxrefLength;
-
+                
         $stat = fseek($this->_f, -$toRead, SEEK_END);
         if ($stat === -1) {
             fseek($this->_f, 0);
         }
-
         $data = fread($this->_f, $toRead);
 
         $keywordPos = strpos(strrev($data), strrev('startxref'));
@@ -309,26 +329,150 @@ class pdf_parser
     {
         $tempPos = $offset - min(20, $offset);
         fseek($this->_f, $tempPos); // set some bytes backwards to fetch corrupted docs
-
+                
         $data = fread($this->_f, 100);
-
+        
         $xrefPos = strrpos($data, 'xref');
-
+        
         if ($xrefPos === false) {
+            // Could be a xref-Stream
+            // Set to the real pointer
             $this->_c->reset($offset);
             $xrefStreamObjDec = $this->_readValue($this->_c);
-
+            
             if (is_array($xrefStreamObjDec) && isset($xrefStreamObjDec[0]) && $xrefStreamObjDec[0] == self::TYPE_OBJDEC) {
-                throw new Exception(
-                    sprintf(
-                        'This document (%s) probably uses a compression technique which is not supported by the ' .
-                        'free parser shipped with FPDI. (See https://www.setasign.com/fpdi-pdf-parser for more details)',
-                        $this->filename
-                    )
-                );
-            } else {
-                throw new Exception('Unable to find xref table.');
+                
+                if (!isset($result['xrefLocation'])) {
+                    $result['xrefLocation'] = $offset;
+                    $result['maxObject'] = 0;
+                }
+                
+                $this->_xref['xref'][$xrefStreamObjDec[1]] = array($xrefStreamObjDec[2] => $offset);
+                
+                $xrefStream = $this->resolveObject(array(self::TYPE_OBJREF, $xrefStreamObjDec[1], $xrefStreamObjDec[2]));
+                
+                if (isset($xrefStream[1][1]['/Type']) && $xrefStream[1][1]['/Type'][1] == '/XRef') {
+                    $xrefStreamData = $this->_unFilterStream($xrefStream);
+
+                    if (isset($xrefStream[1][1]['/Index']))
+                        $sections = count($xrefStream[1][1]['/Index'][1])/2; 
+                    else 
+                        $sections = 1;
+                        
+                    $entryFieldSize = array(
+                        $xrefStream[1][1]['/W'][1][0][1],
+                        $xrefStream[1][1]['/W'][1][1][1],
+                        $xrefStream[1][1]['/W'][1][2][1]
+                    );
+                    
+                    $offset = 0;
+                    
+                    if (!isset($result['xref'])) {
+                        $result['xref'] = array();
+                    } 
+                    
+                    $result['_isXrefStream'] = true;
+                        
+                    for ($count = 0; $count < $sections; $count++) {
+                        $size = $xrefStream[1][1]['/Size'][1];
+                        if (isset($xrefStream[1][1]['/Index'])) {  
+                            $objNum  = $xrefStream[1][1]['/Index'][1][$count * 2][1];
+                            $entries = $xrefStream[1][1]['/Index'][1][$count * 2 + 1][1];
+                        } else {
+                            $objNum  = 0;
+                            $entries = $size;
+                        }  
+                        
+                        if ($size > $result['maxObject'])
+                            $result['maxObject'] = $size;
+                        
+                        for ($entry = 0; $entry < $entries; $entry++) {
+                            $fields = array(1, 0, 0);
+                            if ($entryFieldSize[0] > 0) {
+                                if ($entryFieldSize[0] == 1) {   
+                                    $fields[0] = ord($xrefStreamData[$offset++]);  
+                                } else {  
+                                    $fields[0] = 0;
+                                    for ($k = 0; $k < $entryFieldSize[0]; $k++) {
+                                        $fields[0] = ($fields[0] << 8) + (ord($xrefStreamData[$offset++]) & 0xff);
+                                    }
+                                }
+                            }
+
+                            for ($i = 1; $i < 3; $i++) {
+                                if ($entryFieldSize[$i] > 0) {
+                                    if ($entryFieldSize[$i] == 1) {   
+                                        $fields[$i] = ord($xrefStreamData[$offset++]);  
+                                    } else {  
+                                        $fields[$i] = 0;
+                                        for ($k = 0; $k < $entryFieldSize[$i]; $k++) {
+                                            $fields[$i] = ($fields[$i] << 8) + (ord($xrefStreamData[$offset++]) & 0xff);
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            switch ($fields[0]) {
+                                case 0: // free
+                                    // 1 = object no bzw. $objNum 
+                                    // 2 = gen
+                                    if (!isset($result['xref'][$objNum]))
+                                        $result['xref'][$objNum] = array();
+                                        
+                                    if (!array_key_exists($gen = $fields[2], $result['xref'][$objNum])) {
+                                        $result['xref'][$objNum][$gen] = null;
+                                    } 
+                                    break;
+                                case 1: // normal entry
+                                    // 1 = offset 
+                                    // 2 = gen
+                                    if (!isset($result['xref'][$objNum]))
+                                        $result['xref'][$objNum] = array();
+                                    
+                                    if (!array_key_exists($gen = $fields[2], $result['xref'][$objNum])) {
+                                        $result['xref'][$objNum][$gen] = $fields[1];
+                                    }
+                                    break;
+                                case 2: // entry in an object stream
+                                    // 1 = stream object number
+                                    // 2 = index within the stream object
+                                    if (!isset($result['xref'][$objNum]))
+                                        $result['xref'][$objNum] = array();
+                                    
+                                    if (!isset($result['objStreams'][$objNum]) && (!isset($result['xref'][$objNum]) || !array_key_exists($gen = $fields[2], $result['xref'][$objNum]))) {
+                                        $result['objStreams'][$objNum] = array(
+                                            $fields[1],
+                                            $fields[2]
+                                        );
+                                        
+                                        $result['objStreamObjects'][$fields[1]] = 1;
+                                    } 
+                                    break;
+                            }
+                            
+                            $objNum++;
+                        }
+                    }
+                    
+                    if (!isset($result['trailer'])) {
+                        $result['trailer'] = array(self::TYPE_DICTIONARY, array());
+                        $allowed = array('/Size', '/Root', '/Encrypt', '/Info', '/ID');
+                        for ($i = 0, $n = count($allowed); $i < $n; $i++) {
+                            if (isset($xrefStream[1][1][$allowed[$i]])) {
+                                $result['trailer'][1][$allowed[$i]] = $xrefStream[1][1][$allowed[$i]];
+                            }
+                        }
+                    }
+                    
+                    if (isset($xrefStream[1][1]['/Prev'])) {
+                        $this->_readXref($result, $xrefStream[1][1]['/Prev'][1]);
+                    }
+                    
+                    return true;
+                }
             }
+            
+            throw new Exception('Unable to find xref table.');
         }
 
         if (!isset($result['xrefLocation'])) {
@@ -357,6 +501,7 @@ class pdf_parser
         if ($found === 0) {
             throw new Exception('Xref table seems to be corrupted.');
         }
+
         $differentLineEndings = count(array_unique($m[0]));
         if ($differentLineEndings > 1) {
             $lines = preg_split("/(\r\n|\n|\r)/", $data, -1, PREG_SPLIT_NO_EMPTY);
@@ -368,8 +513,20 @@ class pdf_parser
         unset($data, $differentLineEndings, $m);
 
         $linesCount = count($lines);
-
         $start = 1;
+
+        // Catch corrupted documents where start count is invalid
+        if ($linesCount > 1 && (($line = trim($lines[0])) !== '')) {
+            $pieces = explode(' ', $line);
+            if (count($pieces) == 2 && $pieces[0] == 1) {
+                $nextLine = trim($lines[1]);
+                if (trim($nextLine) === '0000000000 65535 f') {
+                    throw new Exception(
+                        "This cross reference seems to be corrupted."
+                    );
+                }
+            }
+        }
 
         for ($i = 0; $i < $linesCount; $i++) {
             $line = trim($lines[$i]);
@@ -419,6 +576,53 @@ class pdf_parser
     }
 
     /**
+     * Extract the cross reference by searching for object definitions
+     *
+     * @param $result
+     */
+    protected function _extractXref(&$result)
+    {
+        $result['maxObject'] = 0;
+
+        $start = 0;
+        $bufferLen = 20;
+        $this->_c->reset($start, $bufferLen);
+        while ($this->_c->buffer != '') {
+            preg_match('/(\d+) (\d+) obj/U', $this->_c->buffer, $match, PREG_OFFSET_CAPTURE);
+
+            $lastFound = 0;
+            if (count($match) > 0) {
+                $objId = $match[1][0];
+                $generation = $match[2][0];
+
+                if (!isset($result['xref'][$objId]))
+                    $result['xref'][$objId] = array();
+
+                $lastFound = $match[0][1];
+
+                $result['xref'][$objId][$generation] = $start + $lastFound;
+                $result['maxObject'] = max($result['maxObject'], $objId);
+            }
+
+            if (false !== ($pos = strpos($this->_c->buffer, 'trailer'))) {
+                $this->_c->reset($start + $pos + 7);
+                if (!isset($result['trailer'])) {
+                    $result['trailer'] = array();
+                }
+
+                $trailer = $this->_readValue($this->_c);
+                foreach ($trailer[1] AS $key => $value) {
+                    $result['trailer'][1][$key] = $value;
+                }
+            }
+
+            $start += $lastFound;
+            $start += $bufferLen/2;
+            $this->_c->reset($start, $bufferLen);
+        }
+    }
+
+    /**
      * Reads a PDF value
      *
      * @param pdf_context $c
@@ -443,8 +647,7 @@ class pdf_parser
 
                 $pos = $c->offset;
 
-                while(1) {
-
+                while(true) {
                     $match = strpos($c->buffer, '>', $pos);
 
                     // If you can't find it, try
@@ -464,7 +667,6 @@ class pdf_parser
                     return array (self::TYPE_HEX, $result);
                 }
                 break;
-
             case '<<':
                 // This is a dictionary.
 
@@ -477,7 +679,7 @@ class pdf_parser
                         return false;
                     }
 
-                    if (($value =   $this->_readValue($c)) === false) {
+                    if (($value = $this->_readValue($c)) === false) {
                         return false;
                     }
 
@@ -543,7 +745,6 @@ class pdf_parser
                 $tempOffset = $c->offset;
 
                 $c->reset($startPos = $tempPos + $tempOffset);
-
                 // Find the first "newline"
                 while ($c->buffer[0] !== chr(10) && $c->buffer[0] !== chr(13)) {
                     $c->reset(++$startPos);
@@ -621,12 +822,12 @@ class pdf_parser
                 } else if ($token == 'true' || $token == 'false') {
                     return array(self::TYPE_BOOLEAN, $token == 'true');
                 } else if ($token == 'null') {
-                   return array(self::TYPE_NULL);
+                    return array(self::TYPE_NULL);
                 } else {
                     // Just a token. Return it.
                     return array(self::TYPE_TOKEN, $token);
                 }
-         }
+        }
     }
 
     /**
@@ -691,7 +892,7 @@ class pdf_parser
 
                 // Now simply read the object data until
                 // we encounter an end-of-object marker
-                while (true) {
+                while (1) {
                     $value = $this->_readValue($c);
                     if ($value === false || count($result) > 4) {
                         // in this case the parser couldn't find an "endobj" so we break here
@@ -711,6 +912,58 @@ class pdf_parser
                     $result[0] = self::TYPE_STREAM;
                 }
 
+            } else if(isset($this->_xref['objStreams'][$objSpec[1]])) {
+
+                $this->_currentObj =& $result;
+                $result = array (
+                    self::TYPE_OBJECT,
+                    'obj' => $objSpec[1],
+                    'gen' => $objSpec[2]
+                );
+
+                $streamObjId = $this->_xref['objStreams'][$objSpec[1]][0];
+
+                if (!isset($this->_objStreamCache[(string)$streamObjId])) {
+                    $objStreamRef = array(self::TYPE_OBJREF, $streamObjId, 0);
+                    $oReadPlain = $this->_readPlain;
+                    $this->_readPlain = true;
+                    $objStream = $this->resolveObject($objStreamRef);
+                    $this->_readPlain = $oReadPlain;
+
+                    $firstOffset = $objStream[1][1]['/First'][1];
+                    $objectCount = $objStream[1][1]['/N'][1];
+
+                    $stream = $this->_unFilterStream($objStream);
+                    $stream .= ' ';
+
+                    $sc = new pdf_context($stream);
+
+                    for ($i = 0; $i < $objectCount; $i++) {
+                        $objNo = $this->_readToken($sc);
+                        $offset = $this->_readToken($sc);
+                        $objectPos[$objNo] = $firstOffset+$offset;
+                    }
+
+                    $this->_objStreamCache[(string)$streamObjId] = array(
+                        'sc' => $sc,
+                        'objectPos' => $objectPos
+                    );
+                } else {
+                    extract($this->_objStreamCache[(string)$streamObjId]);
+                }
+
+                $sc->reset();
+                $sc->offset = $objectPos[$objSpec[1]];
+                $oReadPlain = $this->_readPlain;
+                $this->_readPlain = false;
+                $result[1] = $this->_readValue($sc);
+                $this->_readPlain = $oReadPlain;
+
+                if (count($this->_objStreamCache) > 2) {
+                    reset($this->_objStreamCache);
+                    $k = key($this->_objStreamCache);
+                    unset($this->_objStreamCache[$k]);
+                }
             } else {
                 throw new Exception(
                     sprintf("Unable to find object (%s, %s) at expected location.", $objSpec[1], $objSpec[2])
@@ -718,6 +971,7 @@ class pdf_parser
             }
 
             return $result;
+
         } else {
             return $objSpec;
         }
@@ -833,7 +1087,6 @@ class pdf_parser
                 $result = substr($c->buffer, $c->offset - 1, $pos + 1);
 
                 $c->offset += $pos;
-
                 return $result;
         }
     }
@@ -865,7 +1118,6 @@ class pdf_parser
         }
 
         $stream = $obj[2][1];
-
         foreach ($filters AS $filter) {
             switch ($filter[1]) {
                 case '/FlateDecode':
@@ -917,6 +1169,19 @@ class pdf_parser
                     break;
                 default:
                     throw new Exception(sprintf('Unsupported Filter: %s', $filter[1]));
+            }
+        }
+
+        if (count($filters) > 0 && isset($obj[1][1]['/DecodeParms']) && isset($obj[1][1]['/DecodeParms'][1]['/Predictor'])) {
+            if (!class_exists('FilterPredictor')) {
+                require_once('filters/FilterPredictor.php');
+            }
+            $decoder = new FilterPredictor();
+
+            if (isset($obj[1][1]['/DecodeParms'][1]['/Columns'])) {
+                $stream = $decoder->decode($stream, $obj[1][1]['/DecodeParms'][1]['/Predictor'][1], $obj[1][1]['/DecodeParms'][1]['/Columns'][1]);
+            } else {
+                $stream = $decoder->decode($stream, $obj[1][1]['/DecodeParms'][1]['/Predictor'][1]);
             }
         }
 

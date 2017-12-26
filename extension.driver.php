@@ -80,6 +80,25 @@
 
 			$pdf->SetAuthor($params['website-name']);
 			$pdf->SetTitle($params['page-title']);
+			//try to add a background pdf
+
+			// if this is a report
+			if (true){
+				$pdf->SetImportUse();
+
+				$attachment = "/pdf-templates/malta-fs5.pdf";
+				// $attachment = "/pdf-templates/malta-fs7.pdf";
+				// $attachment = "/pdf-templates/malta-fs3.pdf";
+				$filepath = WORKSPACE . $attachment;
+				$pagecount = $pdf->SetSourceFile($filepath);
+
+		        $pdf->AddPage();
+
+		        $import_page = $pdf->ImportPage();
+		        $pdf->SetPageTemplate($import_page);
+		        $test = $pdf->UseTemplate($import_page);
+		        // var_dump($test);
+		    }
 
 			// output the HTML content
 			$pdf->writeHTML($output);
