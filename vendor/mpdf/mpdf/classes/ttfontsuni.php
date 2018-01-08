@@ -548,7 +548,6 @@ class TTFontFile
 
 	function extractInfo($debug = false, $BMPonly = false, $useOTL = 0)
 	{
-		die('test');
 		// Values are all set to 0 or blank at start of getMetrics
 		///////////////////////////////////
 		// name - Naming table
