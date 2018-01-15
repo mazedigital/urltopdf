@@ -83,11 +83,11 @@
 			//try to add a background pdf
 
 			// if this is a report
-			if (true){
+			if ($params['current-page'] == "tax-reports"){
 				$pdf->SetImportUse();
 
-				$attachment = "/pdf-templates/malta-fs5.pdf";
-				// $attachment = "/pdf-templates/malta-fs7.pdf";
+				// $attachment = "/pdf-templates/malta-fs5.pdf";
+				$attachment = "/pdf-templates/malta-{$params['name']}.pdf";
 				// $attachment = "/pdf-templates/malta-fs3.pdf";
 				$filepath = WORKSPACE . $attachment;
 				$pagecount = $pdf->SetSourceFile($filepath);
