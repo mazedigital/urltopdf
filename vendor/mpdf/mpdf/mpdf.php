@@ -1153,7 +1153,11 @@ class mPDF
 		$this->SetDisplayPreferences('');
 
 		// Font data
-		require(_MPDF_PATH . 'config_fonts.php');
+		if (file_exists(WORKSPACE . '/urltopdf/config_fonts.php')) {
+			require(WORKSPACE . '/urltopdf/config_fonts.php');
+		} else {
+			require(_MPDF_PATH . 'config_fonts.php');
+		}
 
 		// check for a custom config file that can add/overwrite the default config
 		if (defined('_MPDF_SYSTEM_TTFONTS_CONFIG') && file_exists(_MPDF_SYSTEM_TTFONTS_CONFIG)) {
