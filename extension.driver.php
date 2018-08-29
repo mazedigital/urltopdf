@@ -38,6 +38,7 @@
 		 * Generate a PDF from a complete URL
 		 */
 		public function generatePDFfromURL(array &$context = null) {
+			// return;
 			$page_data = Frontend::Page()->pageData();
 
 			if(!isset($page_data['type']) || !is_array($page_data['type']) || empty($page_data['type'])) return;
@@ -59,6 +60,52 @@
 					$attachments[] = $value->getValue();
 				}
 
+			}
+
+			
+			$chartMatches = array();
+			$hasCharts = preg_match_all("~<chart>(.|\n)*?<\/chart>~", $context['output'],$chartMatches);
+	
+			if ($hasCharts){
+				
+				foreach($chartMatches[0] as $key=>$value) {
+
+					$value = str_replace('<chart>', '', $value);
+					$value = str_replace('</chart>', '', $value);				
+
+
+					// POST QUERY TO GET IMAGE
+					$url = 'https://abzu55zvt4.execute-api.eu-west-2.amazonaws.com/Develop';
+
+					$data_string = $value;
+
+				
+					$ch = curl_init();
+
+				
+					curl_setopt($ch,CURLOPT_URL, $url);
+
+					curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");                                                                     
+					curl_setopt($ch, CURLOPT_POSTFIELDS, $data_string);                                                                  
+					curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);                                                                      
+					curl_setopt($ch, CURLOPT_HTTPHEADER, array(                                                                          
+					    'Content-Type: application/json',                                                                                
+					    'Content-Length: ' . strlen($data_string))                                                                       
+					);                                         
+
+					//execute post
+					$result = json_decode(curl_exec($ch));
+				
+					//close connection
+					curl_close($ch);
+
+
+					$img = 'data:image/png;base64, ' . $result->data;
+
+					$context['output'] = str_replace($value, "<img src='{$img}'/>", $context['output']);
+					
+
+				} 
 			}
 
 			foreach($page_data['type'] as $type) {
@@ -181,8 +228,8 @@
 
 			define('_MPDF_TEMP_PATH',TMP); 
 			define('_JPGRAPH_PATH',TMP. '/graph'); 
-			define('_MPDF_TTFONTPATH',WORKSPACE . '/urltopdf/ttfonts/'); 
-			define('_MPDF_TTFONTDATAPATH',WORKSPACE . '/urltopdf/ttfontdata/'); 
+			// define('_MPDF_TTFONTPATH',WORKSPACE . '/urltopdf/ttfonts/'); 
+			// define('_MPDF_TTFONTDATAPATH',WORKSPACE . '/urltopdf/ttfontdata/'); 
 			$pdf = new mPDF('', 'A4',0,'',15,15,25,25,0,16,'P');
 			// require_once(EXTENSIONS . '/urltopdf/lib/MPDF57/mpdf.php');
 
