@@ -236,8 +236,8 @@
 		private static function initPDF() {
 			require_once EXTENSIONS . '/urltopdf/vendor/autoload.php';
 
-			define('_MPDF_TEMP_PATH',TMP); 
-			define('_JPGRAPH_PATH',TMP. '/graph'); 
+			define('_MPDF_TEMP_PATH',TMP.'/'); 
+			define('_JPGRAPH_PATH',TMP. '/graph/');
 			// define('_MPDF_TTFONTPATH',WORKSPACE . '/urltopdf/ttfonts/'); 
 			// define('_MPDF_TTFONTDATAPATH',WORKSPACE . '/urltopdf/ttfontdata/'); 
 			$pdf = new mPDF('', 'A4',0,'',15,15,25,25,0,16,'P');
