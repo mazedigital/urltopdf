@@ -99,11 +99,21 @@
 					//close connection
 					curl_close($ch);
 
+					if(isset($result->data)){
 
-					$img = 'data:image/png;base64, ' . $result->data;
+						$img = 'data:image/png;base64, ' . $result->data;
 
-					$context['output'] = str_replace($value, "<img src='{$img}'/>", $context['output']);
-					
+						$context['output'] = str_replace($value, "<img src='{$img}'/>", $context['output']);
+
+					}	
+					else {
+
+						$context['output'] = str_replace($value, "", $context['output']);
+
+					}
+
+						// var_dump($context['output']);die;
+
 
 				} 
 			}
