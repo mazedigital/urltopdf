@@ -61,10 +61,27 @@
 
 			}
 
+			$matches = array();
+			$hasFileName = preg_match("~(<fileName>.+<\/fileName>)~", $context['output'],$matches);
+
+			$fileName = "download.pdf";
+			if ($hasFileName){
+				$fileNameString = $matches[1];
+
+				$context['output'] = str_replace($fileNameString, "", $context['output']);
+
+				$fileNameXML = XMLElement::convertFromXMLString('fileName',$fileNameString);
+				
+				foreach ($fileNameXML->getChildren() as $key => $value) {
+					$fileName = $value;
+				}
+
+			}
+
 			foreach($page_data['type'] as $type) {
 				if($type == 'pdf') {
 					// Page has the 'pdf' type set, so lets generate!
-					$this->generatePDF($context['output'],$attachments);
+					$this->generatePDF($context['output'],$fileName,$attachments);
 				}
 				else if($type == 'pdf-attachment') {
 					// Page has the 'pdf-attachment' type set, so lets generate some attachments
@@ -73,7 +90,7 @@
 			}
 		}
 
-		public function generatePDF($output,$attachments) {
+		public function generatePDF($output,$fileName,$attachments) {
 			$params = Frontend::Page()->_param;
 
 			$pdf = self::initPDF();
@@ -128,15 +145,8 @@
 				}
 			}
 
-
-			//Close and output PDF document
-			if ($params['current-page']=='pdf'){
-				$name = $params['root-page'];
-			} else {
-				$name = $params['current-page'];
-			}
-			$name .= '-'.$params['member-current-account.name'].'.pdf';
-			$pdf->Output('name','I');
+			$name = $fileName . '.pdf';
+			$pdf->Output($name ,'I');
 			exit();
 		}
 
