@@ -70,6 +70,7 @@
 				
 				foreach($chartMatches[0] as $key=>$value) {
 
+				    $value = str_replace('],]', ']]', $value);	//avoiding json malformed
 					$value = str_replace('<chart>', '', $value);
 					$value = str_replace('</chart>', '', $value);				
 
@@ -79,6 +80,7 @@
 
 					$data_string = $value;
 
+				
 				
 					$ch = curl_init();
 
@@ -100,10 +102,11 @@
 					curl_close($ch);
 
 					if(isset($result->data)){
+						
 
 						$img = 'data:image/png;base64, ' . $result->data;
 
-						$context['output'] = str_replace($value, "<img src='{$img}'/>", $context['output']);
+						$context['output'] = str_replace($value, "<img src='{$img}'/>", str_replace('],]', ']]',$context['output']));
 
 					}	
 					else {
