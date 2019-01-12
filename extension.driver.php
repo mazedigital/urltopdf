@@ -109,13 +109,13 @@
 				$filepath = WORKSPACE . $attachment;
 				$pagecount = $pdf->SetSourceFile($filepath);
 
-		        $pdf->AddPage();
+				$pdf->AddPage();
 
-		        $import_page = $pdf->ImportPage();
-		        $pdf->SetPageTemplate($import_page);
-		        $test = $pdf->UseTemplate($import_page);
-		        // var_dump($test);
-		    }
+				$import_page = $pdf->ImportPage();
+				$pdf->SetPageTemplate($import_page);
+				$test = $pdf->UseTemplate($import_page);
+				// var_dump($test);
+			}
 
 			// output the HTML content
 			$pdf->writeHTML($output);
@@ -135,13 +135,13 @@
 
 					$pagecount = $pdf->SetSourceFile($filepath);
 
-				    for ($i=1; $i<=$pagecount; $i++) {
-				    	//add a new page as PDF should not contain one
-				        $pdf->AddPage();
+					for ($i=1; $i<=$pagecount; $i++) {
+						//add a new page as PDF should not contain one
+						$pdf->AddPage();
 
-				        $import_page = $pdf->ImportPage();
-				        $pdf->UseTemplate($import_page);
-				    }
+						$import_page = $pdf->ImportPage();
+						$pdf->UseTemplate($import_page);
+					}
 				}
 			}
 
@@ -208,11 +208,41 @@
 		private static function initPDF() {
 			require_once EXTENSIONS . '/urltopdf/vendor/autoload.php';
 
-			define('_MPDF_TEMP_PATH',TMP); 
+				$defaultConfig = (new Mpdf\Config\ConfigVariables())->getDefaults();
+				$fontDirs = $defaultConfig['fontDir'];
+
+				$defaultFontConfig = (new Mpdf\Config\FontVariables())->getDefaults();
+				$fontData = $defaultFontConfig['fontdata'];
+
+				$ourConfig = array(
+					'tempDir' => TMP,
+					'margin_top' => 25,
+					'margin_bottom' => 25,
+					'margin_left' => 15,
+					'margin_right' => 15,
+					'margin_header' => 0,
+					'margin_footer' => 16,
+					'mirrorMargins' => true,
+					'mode' => 'utf-8', 
+					'format' => 'A4',
+					'orientation' => 'P',
+					'fontDir' => array_merge($fontDirs,[
+						WORKSPACE . '/urltopdf/ttfonts',
+					]),
+				);
+
+				$projectConfig = array();
+				if (file_exists(WORKSPACE . '/urltopdf/config.php')){
+					$projectConfig = include (WORKSPACE . '/urltopdf/config.php');
+				}
+					
+			// define('_MPDF_TEMP_PATH',TMP); 
 			define('_JPGRAPH_PATH',TMP. '/graph'); 
 			define('_MPDF_TTFONTPATH',WORKSPACE . '/urltopdf/ttfonts/'); 
 			define('_MPDF_TTFONTDATAPATH',WORKSPACE . '/urltopdf/ttfontdata/'); 
-			$pdf = new mPDF('', 'A4',0,'',15,15,25,25,0,16,'P');
+			$pdf = new \Mpdf\Mpdf(
+				array_merge($defaultConfig, $ourConfig, $projectConfig)
+			);
 			// require_once(EXTENSIONS . '/urltopdf/lib/MPDF57/mpdf.php');
 
 			// $pdf = new mpdf('', 'A4',0,'',15,15,25,25,0,16,'P'); //left,right,top,bottom
