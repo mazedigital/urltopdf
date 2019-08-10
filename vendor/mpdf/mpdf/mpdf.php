@@ -12830,7 +12830,7 @@ class mPDF
 							if ($trnsrgb != array($r, $g, $b) && $trns == array($c1, $c2, $c3, $c4)) {
 								if ($c4 == 0) {
 									$c4 = 1;
-								} else {
+					} else {
 									$c4--;
 								}
 							}
@@ -30645,8 +30645,8 @@ class mPDF
 				$size *= $maxsize * 2;
 			}
 		} else
-			$size *= (25.4 / $this->dpi); //nothing == px
-
+			//$size *= (25.4 / $this->dpi); //nothing == px
+                       $size = 4 * (25.4 / 96);
 		return $size;
 	}
 

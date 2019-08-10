@@ -609,8 +609,12 @@ class TTFontFile
 		if (!$psName)
 			throw new MpdfException("Could not find PostScript font name: " . $this->filename);
 		// CHECK IF psName valid (PadaukBook contains illegal characters in Name ID 6 i.e. Postscript Name)
-		$psNameInvalid = false;
-		for ($i = 0; $i < count($psName); $i++) {
+		$psNameInvalid = false; 
+		$value = 1;
+		if(is_array($psName)) {
+			$value = count($psName); 
+		};
+		for ($i = 0; $i < $value; $i++) {
 			$c = $psName[$i];
 			$oc = ord($c);
 			if ($oc > 126 || strpos(' [](){}<>/%', $c) !== false) {

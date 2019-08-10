@@ -276,8 +276,8 @@
 
 			$pdf->debug = true;
 			//$pdf->packTableData = true;
-			$securePassword = uniqid('securePassword');
-			$pdf->SetProtection(array('copy','print'), '', $securePassword);
+			//$securePassword = uniqid('securePassword');
+			//$pdf->SetProtection(array('copy','print'), '', $securePassword);
 			//$pdf->setAutoTopMargin  = 'stretch';
 			//$pdf->setAutoBottomMargin = 'stretch';
 
